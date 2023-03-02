@@ -4,8 +4,8 @@
 - [Getting started](#getting-started)
 - [How to use](#how-to-use)
 - [Contributing](#contributing)
-  - [Developer Guide, Architecture and Technical Design](#developer-guide-architecture-and-technical-design)
-  - [Security Considerations](#security-considerations)
+- [Developer Guide, Architecture and Technical Design](#developer-guide-architecture-and-technical-design)
+
 
 ## About the project
 
@@ -28,6 +28,15 @@ Check out the repository and navigate to the working directory.
     git clone git@github.com:secvisogram/secvisogram_demonstrator
     cd secvisogram_demonstrator
 
+Create a `.env` from `template.env`. The following values must be changed:
+- `KEYCLOAK_DATABASE_PASSWORD`
+- `KEYCLOAK_ADMIN_PASSWORD`
+- `KEYCLOAK_MANAGEMENT_PASSWORD`
+- `CSAF_CLIENT_SECRET`
+- `CSAF_COOKIE_SECRET`
+- `CSAF_COUCHDB_PASSWORD`
+
+
 Now you can start a development server as follows:
 
     docker-compose up
@@ -36,7 +45,6 @@ The containers will try to start. Some container need some additional configurat
 
 	docker compose -f docker-compose.yaml up init-keycloak
 	docker compose -f docker-compose.yaml up init-cms-backend-db
-	docker compose -f docker-compose.yaml up init-provider
 
 The application is now running and accessible at http://localhost
 
@@ -46,13 +54,13 @@ The application is now running and accessible at http://localhost
 
 When deploying this environment to production **Keycloak**, **Couchdb** and **postgresql** container need to be configured for production use. Please refer to the guides provided by these projects:
 
-[(Keycloak)](https://keycloak.org)
-[(CouchDB)](https://couchdb.org)
-[(Postgresql)](https://postgreql.org)
+- [(Keycloak)](https://keycloak.org)
+- [(CouchDB)](https://couchdb.apache.org)
+- [(Postgresql)](https://postgresql.org)
 
-There is template file ´´config/keycloak/csaf-realm.json´´ for keycloak can be used as a starting point. This file contains all relevant informations for the realm, but no default user. You could also use ´´config/keycloak/csaf-realm-demo.json´´, remove the demo users and create new users by your own.
+There is template file `config/keycloak/csaf-realm.json` for keycloak can be used as a starting point. This file contains all relevant informations for the realm, but no default user. You could also use `config/keycloak/csaf-realm-demo.json`, remove the demo users and create new users by your own.
 
-The config file ´´config/reverse-proxy/nginx.conf´´ for the reverse proxy contains some URL to access couchdb and keycloak. These lines have to be removed.
+The config file `config/reverse-proxy/nginx.conf` for the reverse proxy contains some URL to access couchdb and keycloak. These lines have to be removed.
 
 [(back to top)](#secvisogram-csaf-demonstration-environment)
 
