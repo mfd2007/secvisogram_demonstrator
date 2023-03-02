@@ -1,0 +1,215 @@
+version: '3.8'
+services:
+  keycloak_db:
+    image: bitnami/postgresql:11
+    hostname: keycloak_db.internal
+    restart: on-failure
+    env_file: .env
+    environment:
+      POSTGRESQL_DATABASE: ${KEYCLOAK_DATABASE_NAME}
+      POSTGRESQL_USER: ${KEYCLOAK_DATABASE_USER}
+      POSTGRESQL_PASSWORD: ${KEYCLOAK_DATABASE_PASSWORD}
+    networks:
+      keycloak-internal:
+        aliases:
+          - "keycloak_db.internal"
+    volumes:
+      - 'postgresql_data:/bitnami/postgresql'
+
+
+  #Keycloak is running in development mode! Do not use in production!
+  keycloak:
+    image: bitnami/keycloak:19
+    hostname: keycloak.internal
+    restart: on-failure
+    depends_on:
+      - keycloak_db
+    env_file: .env
+    environment:
+      KEYCLOAK_CREATE_ADMIN_USER: "true"
+      KEYCLOAK_ADMIN_USER: ${KEYCLOAK_ADMIN_USER}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KEYCLOAK_MANAGEMENT_USER: ${KEYCLOAK_MANAGEMENT_USER} 
+      KEYCLOAK_MANAGEMENT_PASSWORD: ${KEYCLOAK_MANAGEMENT_PASSWORD} 
+      
+      KEYCLOAK_DATABASE_HOST: keycloak_db
+      KEYCLOAK_DATABASE_NAME: ${KEYCLOAK_DATABASE_NAME}
+      KEYCLOAK_DATABASE_USER: ${KEYCLOAK_DATABASE_USER}
+      KEYCLOAK_DATABASE_PASSWORD: ${KEYCLOAK_DATABASE_PASSWORD}
+    networks:
+      keycloak-internal: {}
+      proxy-internal: 
+         aliases:
+          - "keycloak.internal"
+
+# Run this manually to import the default keycloak config since 'depends_on' is currently broken.
+  init-keycloak:
+    image: bitnami/keycloak-config-cli:5.4.0
+    profiles: [ "run_manually" ]
+    env_file: .env
+    depends_on:
+      - keycloak
+    environment:
+      KEYCLOAK_URL: "http://keycloak.internal:8080/"
+      KEYCLOAK_USER: ${KEYCLOAK_ADMIN_USER}
+      KEYCLOAK_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      #Attention! This realm config contain test users and client secret! Only for demo purposes! Do not use in production!
+      IMPORT_FILES_LOCATIONS: "/config/csaf-realm-demo.json"
+      #Realm config without test users and client secret!
+      #IMPORT_FILES_LOCATIONS: "/config/csaf-realm.json"
+    volumes:
+      - ./config/keycloak:/config:ro
+    networks:
+      keycloak-internal: {}
+
+
+  oauthproxy:
+    image: bitnami/oauth2-proxy:7
+    hostname: oauthproxy.internal
+    env_file: .env
+    depends_on:
+      - keycloak
+    restart: on-failure
+    command: "--upstream http://validator.internal:8082/api/v1/validate,http://validator.internal:8082/api/v1/tests,http://cms-backend.internal:8081/api/v1/advisories,http://cms-backend.internal:8081/api/v1/advisories/"
+    environment:
+      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
+      # Security related configcat 
+      OAUTH2_PROXY_COOKIE_SECURE: "false"
+      OAUTH2_PROXY_COOKIE_HTTPONLY: "true"
+      OAUTH2_PROXY_COOKIE_SAMESITE: "lax"
+      OAUTH2_PROXY_COOKIE_REFRESH: "4m"
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      # OIDC provider config
+      OAUTH2_PROXY_PROVIDER: oidc
+      OAUTH2_PROXY_PROVIDER_DISPLAY_NAME: ${CSAF_OIDC_PROVIDER}
+      # You need to set your keycloak "Frontend URL", in our case "http://localhost:9000/auth/"
+      # If you don't want to use autodiscovery, you have to set all urls by hand (login-url, oidc-jwks-url, redeem-url, ...)
+      OAUTH2_PROXY_OIDC_ISSUER_URL: "http://keycloak.internal:8080/realms/${CSAF_REALM}"
+      OAUTH2_PROXY_INSECURE_OIDC_SKIP_ISSUER_VERIFICATION: "true"
+      OAUTH2_PROXY_WHITELIST_DOMAINS: "localhost:4180"
+      # Client credentials
+      OAUTH2_PROXY_CLIENT_ID: ${CSAF_CLIENT_ID}
+      OAUTH2_PROXY_CLIENT_SECRET: ${CSAF_CLIENT_SECRET}
+      OAUTH2_PROXY_COOKIE_SECRET: ${CSAF_COOKIE_SECRET}
+      OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL: "true"
+      # Pass ID token to upstream
+      OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "true"
+      OAUTH2_PROXY_PASS_BASIC_AUTH: "false"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "false"
+      OAUTH2_PROXY_PASS_HOST_HEADER: "false"
+      # Built-in authorization checks (disabled)
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+    networks:
+      proxy-internal:
+        aliases:
+          - "oauthproxy.internal"
+    
+  reverse-proxy:
+    image:  nginx:1.23-alpine
+    hostname: "csaf.test"
+    restart: on-failure
+    ports:
+      - "80:80" 
+    volumes:
+      - "./config/reverse-proxy/nginx.conf:/etc/nginx/nginx.conf:ro"
+    networks:
+      backend-internal: {}
+      proxy-internal: {}
+      external: {}
+
+  validator:
+    image: csaf/validator-service
+    build: ./docker/csaf-validator-service
+    hostname: validator.internal
+    restart: on-failure
+    networks:
+      proxy-internal:
+        aliases:
+          - "validator.internal"
+
+  secvisogram:
+    image: csaf/secvisogram
+    build: ./docker/secvisogram
+    hostname: secvisogram.internal
+    restart: on-failure
+    volumes:
+      - "./config/secvisogram/de.bsi.secvisogram.json:/usr/share/nginx/html/.well-known/appspecific/de.bsi.secvisogram.json:ro"
+      - "./config/secvisogram/favicon.png:/usr/share/nginx/html/favicon.ico:ro"
+    networks:
+      proxy-internal:
+        aliases:
+          - "secvisogram.internal"
+  
+  cms-backend-db:
+    image: bitnami/couchdb:3
+    hostname: cms-backend-db.internal
+    volumes:
+      - couchdb-data:/bitnami/couchdb
+    environment:
+      COUCHDB_USER: ${CSAF_COUCHDB_USER}
+      COUCHDB_PASSWORD: ${CSAF_COUCHDB_PASSWORD}
+    networks:
+      backend-internal: 
+        aliases:
+          - "cms-backend-db.internal"
+          
+  cms-backend:
+    image: csaf/cms-backend
+    build: ./docker/csaf-cms-backend
+    hostname: cms-backend.internal
+    depends_on:
+      - cms-backend-db
+    environment:
+      CSAF_CMS_BACKEND_CSRF_ENABLED: "true"
+      # CouchDB
+      CSAF_COUCHDB_HOST: cms-backend-db.internal
+      CSAF_COUCHDB_PORT: ${CSAF_COUCHDB_PORT}
+      CSAF_COUCHDB_SSL: "false"
+      CSAF_COUCHDB_DBNAME: ${CSAF_COUCHDB_DATABASE}
+      CSAF_COUCHDB_USER: ${CSAF_COUCHDB_USER}
+      CSAF_COUCHDB_PASSWORD: ${CSAF_COUCHDB_PASSWORD}
+      
+      CSAF_TEMPLATES_FILE: "/var/csaf/template/allTemplates.json"
+      CSAF_COMPANY_LOGO_PATH: "/var/csaf/logo.png"
+      # versioning strategy: Integer or Semantic
+      CSAF_VERSIONING: "Semantic"
+      # revision history summary an workflow changes
+      CSAF_SUMMARY_PUBLICATION: "Initial Publication"
+      # validation server url for call from backend
+      CSAF_VALIDATION_BASE_URL: "http://validator.internal:8082/api/v1"
+      # max. levenshtein distance between changed values in the csaf document to decide whether a change is a patch or a minor change
+      CSAF_VERSIONING_LEVENSHTEIN: "4"
+    volumes:
+      - "./config/cms-backend/logo.png:/var/csaf/logo.png:ro"
+      - "./config/cms-backend/template/:/var/csaf/template/:ro"
+      - "./config/cms-backend/config/:/usr/local/bin/config/:ro"
+    networks:
+      backend-internal: {}
+      proxy-internal:
+          aliases:
+          - "cms-backend.internal"
+
+# Run this manually to initialize CSAF provider
+  init-cms-backend-db:
+    image: curlimages/curl:latest
+    depends_on:
+      - cms-backend-db
+    profiles: [ "run_manually" ]
+    command: -u  ${CSAF_COUCHDB_USER}:${CSAF_COUCHDB_PASSWORD} -X PUT ${CSAF_COUCHDB_HOST}:${CSAF_COUCHDB_PORT}/${CSAF_COUCHDB_DATABASE}
+    networks:
+      proxy-internal: {}
+      backend-internal: {}
+
+networks:
+  keycloak-internal: {}
+  backend-internal: {}
+  proxy-internal: {}
+  external: {}
+  
+volumes:
+  postgresql_data:
+    driver: local
+  couchdb-data:
+    driver: local
+  provider-data:
+    driver: local

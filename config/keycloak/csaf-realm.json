@@ -1,0 +1,118 @@
+{
+  "clients": [
+    {
+      "adminUrl": "http://localhost",
+      "bearerOnly": false,
+      "clientAuthenticatorType": "client-secret",
+      "clientId": "secvisogram",
+      "consentRequired": false,
+      "directAccessGrantsEnabled": false,
+      "enabled": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "publicClient": false,
+      "redirectUris": [
+        "http://localhost*"
+      ],
+      "rootUrl": "http://localhost",
+      "webOrigins": [
+        "http://localhost"
+      ],
+      "protocolMappers": [
+        {
+          "name": "client roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "claim.name": "groups",
+            "jsonType.label": "String",
+            "usermodel.clientRoleMapping.clientId": "secvisogram"
+          }
+        }
+      ]
+    }
+  ],
+  "displayName": "CSAF Realm",
+  "realm": "csaf",
+  "enabled": true,
+  "registrationAllowed": false,
+  "verifyEmail": false,
+  "attributes" : {
+    "frontendUrl": "http://localhost:9000/"
+  },
+  "roles": {
+    "client": {
+      "secvisogram": [
+        {
+          "attributes": {},
+          "clientRole": true,
+          "composite": false,
+          "name": "registered"
+        },
+        {
+          "attributes": {},
+          "clientRole": true,
+          "composite": true,
+          "composites": {
+            "client": {
+              "secvisogram": [
+                "registered"
+              ]
+            }
+          },
+          "name": "author"
+        },
+        {
+          "attributes": {},
+          "clientRole": true,
+          "composite": true,
+          "composites": {
+            "client": {
+              "secvisogram": [
+                "author"
+              ]
+            }
+          },
+          "name": "editor"
+        },
+        {
+          "attributes": {},
+          "clientRole": true,
+          "composite": true,
+          "composites": {
+            "client": {
+              "secvisogram": [
+                "editor"
+              ]
+            }
+          },
+          "name": "publisher"
+        },
+        {
+          "attributes": {},
+          "clientRole": true,
+          "composite": true,
+          "composites": {
+            "client": {
+              "secvisogram": [
+                "registered"
+              ]
+            }
+          },
+          "name": "reviewer"
+        },
+        {
+          "attributes": {},
+          "clientRole": true,
+          "composite": false,
+          "name": "auditor"
+        }
+      ],
+      "validator": []
+    }
+  }
+}

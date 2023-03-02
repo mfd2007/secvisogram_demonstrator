@@ -1,0 +1,10 @@
+[
+  { "id": "T1",
+    "description":"Test Template 1",
+    "file":"template1.json"
+  },
+  { "id": "T2",
+    "description":"Test Template 2",
+    "file":"template2.json"
+  }
+]
