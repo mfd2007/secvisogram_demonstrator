@@ -108,14 +108,16 @@ Please refer to [`CONTRIBUTING.md`](CONTRIBUTING.md) for details about how to co
     Rel(reverseproxy, secvisogram,"/")
     Rel(reverseproxy, oauth,"/api/*")
     Rel(reverseproxy, keycloak,"/realm/csaf/")
-    Rel(reverseproxy, provider,"/.well-known/csaf")
     Rel(oauth, validator, "/api/v1/test")
     Rel(oauth, validator, "/api/v1/validate")
     Rel(oauth, backend, "/api/v1/advisories/*")
     Rel(backend, backend-db,"")
     Rel(backend, keycloak,"")
-    Rel(keycloak, keycloak-db,"")   
+    Rel(keycloak, keycloak-db,"")
+   
 
 ```
+
+
 
 [(back to top)](#secvisogram-csaf-demonstration-environment)
